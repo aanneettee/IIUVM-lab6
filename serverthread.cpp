@@ -7,7 +7,7 @@
 #include <chrono>
 #include <ctime>
 #include <fstream>
-#include <algorithm>  // Для min/max
+#include <algorithm>
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "Bthprops.lib")
@@ -16,6 +16,15 @@
 static const GUID RFCOMM_SERVICE_UUID = {
     0x00001101, 0x0000, 0x1000, {0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB}
 };
+
+// Вспомогательная функция для конвертации wide string в UTF-8
+static std::string wide_to_utf8(const std::wstring& wstr) {
+    if (wstr.empty()) return "";
+    int size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    std::string str(size - 1, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &str[0], size, nullptr, nullptr);
+    return str;
+}
 
 ServerThread::ServerThread()
     : m_stopServer(false)
@@ -137,6 +146,11 @@ void ServerThread::run()
         return;
     }
 
+    // Устанавливаем таймауты для серверного сокета
+    int timeout = 10000; // 10 секунд
+    setsockopt(serverSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+    setsockopt(serverSocket, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
+
     if (bind(serverSocket,
         reinterpret_cast<sockaddr*>(&sockaddrBth),
         sizeof(sockaddrBth)) == SOCKET_ERROR) {
@@ -171,6 +185,10 @@ void ServerThread::run()
             reinterpret_cast<sockaddr*>(&clientAddr),
             &clientAddrSize);
         if (clientSocket == INVALID_SOCKET) continue;
+
+        // Устанавливаем таймауты для клиентского сокета
+        setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+        setsockopt(clientSocket, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
 
         postEvent({ Event::ClientConnected });
         postEvent({ Event::StatusMessage, "Client connected" });

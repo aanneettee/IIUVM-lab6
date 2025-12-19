@@ -15,6 +15,15 @@ static const GUID RFCOMM_SERVICE_UUID = {
     0x00001101, 0x0000, 0x1000, {0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB}
 };
 
+// Вспомогательная функция для конвертации wide string в UTF-8
+static std::string wide_to_utf8(const std::wstring& wstr) {
+    if (wstr.empty()) return "";
+    int size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    std::string str(size - 1, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &str[0], size, nullptr, nullptr);
+    return str;
+}
+
 BluetoothTransfer::BluetoothTransfer()
     : m_clientSocket(INVALID_SOCKET)
     , m_isConnected(false)
@@ -164,13 +173,9 @@ void BluetoothTransfer::runDiscovery()
         do {
             if (m_stopDiscovery) break;
 
-            // Преобразование wide char в string с учетом кодировки
+            // Преобразование wide char в UTF-8
             std::wstring wname(deviceInfo.szName);
-
-            // Преобразование Unicode в UTF-8 для кросс-платформенной совместимости
-            int size_needed = WideCharToMultiByte(CP_UTF8, 0, wname.c_str(), (int)wname.size(), NULL, 0, NULL, NULL);
-            std::string name(size_needed, 0);
-            WideCharToMultiByte(CP_UTF8, 0, wname.c_str(), (int)wname.size(), &name[0], size_needed, NULL, NULL);
+            std::string name = wide_to_utf8(wname);
 
             // Форматирование адреса
             std::ostringstream oss;
@@ -219,6 +224,11 @@ bool BluetoothTransfer::connectToDevice(const char* address)
         postEvent({ Event::StatusMessage, "Error creating client socket" });
         return false;
     }
+
+    // Устанавливаем таймауты для предотвращения зависаний
+    int timeout = 10000; // 10 секунд
+    setsockopt(m_clientSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+    setsockopt(m_clientSocket, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
 
     if (::connect(m_clientSocket, reinterpret_cast<sockaddr*>(&sockaddrBthServer), sizeof(sockaddrBthServer)) == SOCKET_ERROR) {
         int errorCode = WSAGetLastError();

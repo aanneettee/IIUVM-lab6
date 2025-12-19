@@ -1,4 +1,4 @@
-﻿﻿import sys
+﻿import sys
 import os
 import ctypes
 import logging
@@ -153,11 +153,6 @@ class BluetoothBackend:
             # Пользовательская директория (можно задать через переменную окружения)
             os.path.join(os.environ.get("BLUETOOTH_LIB_PATH", ""), f"{base_name}.dll")
         ]
-        
-        # Добавляем абсолютный путь только если он существует
-        hardcoded_path = r"D:\3 курс\ИиУВМ\лаба1\x64\Debug\bluetooth_transfer.dll"
-        if os.path.exists(hardcoded_path):
-            possible_paths.insert(0, hardcoded_path)
         
         for path in possible_paths:
             if os.path.exists(path):
@@ -373,11 +368,6 @@ class ServerBackend:
             f"./{base_name}.dll",
             f"../{base_name}.dll",
         ]
-        
-        # Добавляем абсолютный путь только если он существует
-        hardcoded_path = r"D:\3 курс\ИиУВМ\лаба1\x64\Debug\serverthread.dll"
-        if os.path.exists(hardcoded_path):
-            possible_paths.insert(0, hardcoded_path)
         
         for path in possible_paths:
             if os.path.exists(path):
@@ -1081,6 +1071,7 @@ class BluetoothGUI(QWidget):
             QMessageBox.warning(self, "Предупреждение", "Сначала выберите файл для отправки")
             return
         
+        # ФИКС: Проверка существования файла
         if not os.path.exists(self.selected_file):
             QMessageBox.warning(self, "Ошибка", "Файл не существует или был удален. Выберите другой файл.")
             self.selected_file = ""
@@ -1218,10 +1209,6 @@ class BluetoothGUI(QWidget):
         download_dir = "received_files"
         if os.path.exists(download_dir):
             os.startfile(download_dir)  # Windows
-            # Для других ОС можно использовать:
-            # import subprocess
-            # subprocess.run(['open', download_dir])  # macOS
-            # subprocess.run(['xdg-open', download_dir])  # Linux
         else:
             QMessageBox.information(self, "Информация", f"Папка '{download_dir}' не существует")
     
@@ -1370,8 +1357,11 @@ class BluetoothGUI(QWidget):
                 self.logger.error(f"Ошибка при отключении: {e}")
         
         # Завершаем pygame
-        if pygame.mixer.get_init():
-            pygame.mixer.quit()
+        try:
+            if pygame.mixer.get_init():
+                pygame.mixer.quit()
+        except Exception as e:
+            self.logger.error(f"Ошибка при завершении pygame: {e}")
         
         event.accept()
 
